@@ -70,27 +70,42 @@ MOVWF WPUB;  weak pullups
 CLRF IOCB; Disables interruption change B
 CLRF PSTRCON ;Disables PWM
 CLRF TRISC   ;Sets port c as an output
+MOVWF TRISA ; Now correctly write to TRISA
+MOVLW 0x0F
     
 ;BANK 0
 BCF STATUS, 5 ;Clears bit 5 to acces bank 0
 BCF STATUS, 6 ;Clears bit 6 to access bank 0
 CLRF CCP1CON  ;Disables the other PWM module
 CLRF PORTC    ;Clears the port c register
+CLRF PORTA
 CLRF CCP2CON  ;Disables the second PWM function
 CLRF PORTB    ;Clears the bits in portB
 CLRF RCSTA    ;Turns of the Control register
 CLRF SSPCON   ;Turns off the serial control port
 CLRF T1CON    ;Turns off timer control register
+ BSF PIE1, 0 ;CUSTOM INTERRUPT
+MOVLW 0XC0
+MOVWF INTCON
 ;Main Program Loop (Loops forever)
 
 SUB:
 MOVWF PORTC	;Move W to F (PortC) 
         
 MAINLOOP:
-    
+
+TESTLOOP:
+    BTFSS PORTA, 1
+    GOTO BUTTON_PRESSED
+    BCF PORTA, 5 ;IF BUTTON ISN'T PRESSED CLEAR LIGHT
+BUTTON_PRESSED:
+   
+    BSF PIR1, 0
      ; Scan Row 3 (keys 7,8,9) - RB4=1, RB5=1, RB6=0
     MOVLW 0x60
     MOVWF PORTB
+    
+SCAN:
 ; CALL DELAY
     BTFSS PORTB,3 ; Key 7
     GOTO DISP_9
@@ -125,26 +140,29 @@ MAINLOOP:
     
     GOTO DISP_0 ; **Change: Jump to DISP_0 instead of MAINLOOP**
 
+;53 SHOWS AN S
+;20 APPEARS AS BLANK
     
-DISP_0: MOVLW 0X00
+    
+DISP_0: MOVLW 0X53
 	GOTO DISPLAY
-DISP_1: MOVLW 0x01 ; 1
+DISP_1: MOVLW 0x20 ; 1
         GOTO DISPLAY
-DISP_2: MOVLW 0x02 ; 2
+DISP_2: MOVLW 0x32 ; 2
         GOTO DISPLAY
-DISP_3: MOVLW 0x03 ; 3
+DISP_3: MOVLW 0x33 ; 3
         GOTO DISPLAY
-DISP_4: MOVLW 0x04 ; 4 (if 0x04 shows 9, use 0x04 for 9, adjust others)
+DISP_4: MOVLW 0x34 ; 4 (if 0x04 shows 9, use 0x04 for 9, adjust others)
         GOTO DISPLAY
-DISP_5: MOVLW 0x05 ; 5
+DISP_5: MOVLW 0x35 ; 5
         GOTO DISPLAY
-DISP_6: MOVLW 0x06 ; 6
+DISP_6: MOVLW 0x36 ; 6
         GOTO DISPLAY
-DISP_7: MOVLW 0x07 ; 7
+DISP_7: MOVLW 0x37 ; 7
         GOTO DISPLAY
-DISP_8: MOVLW 0x08 ; 8
+DISP_8: MOVLW 0x38 ; 8
         GOTO DISPLAY
-DISP_9: MOVLW 0x09 ; 9
+DISP_9: MOVLW 0x39 ; 9
         GOTO DISPLAY
 
 DISPLAY:
@@ -153,7 +171,9 @@ DISPLAY:
     GOTO MAINLOOP
 
 INTERRUPT:
+LIGHT:
+    BSF PORTA, 5
+  
     RETFIE
 
 END ;End of code. This is required
-
