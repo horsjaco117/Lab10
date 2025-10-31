@@ -46,47 +46,42 @@
     PSECT code, class=CODE, delta=2
 Start:      
  
-Setup:
-
-;Bank 3
-BSF STATUS, 5 	; Go to Bank 3
-BSF STATUS, 6	 ; Go to Bank 3
-MOVLW 0X0F	 ;Bits all 1's to set port B as inputs
-MOVWF TRISB	 ;Sets all TRISB to 0
-CLRF ANSELH	 ; Sets pin function, Digital I/O
-CLRF INTCON	;Controls interupts, which are needed for output
-CLRF OPTION_REG ;Move w to address 0x81
-
-;Bank 2
-BSF STATUS, 6 ;Go to Bank 2
-BCF STATUS, 5 ; Go to Bank 2
-CLRF CM2CON1  ; Set all bits to 0
-
-;Bank 1
-BSF STATUS, 5 ;Sets bit 5 for bank 1
-BCF STATUS, 6 ;Clears bit 6 to access bank 1
-MOVLW 0XFF    ;Enables all pull up resistors on port B
-MOVWF WPUB;  weak pullups
-CLRF IOCB; Disables interruption change B
-CLRF PSTRCON ;Disables PWM
-CLRF TRISC   ;Sets port c as an output
-MOVWF TRISA ; Now correctly write to TRISA
-MOVLW 0x0F
-    
-;BANK 0
-BCF STATUS, 5 ;Clears bit 5 to acces bank 0
-BCF STATUS, 6 ;Clears bit 6 to access bank 0
-CLRF CCP1CON  ;Disables the other PWM module
-CLRF PORTC    ;Clears the port c register
-CLRF PORTA
-CLRF CCP2CON  ;Disables the second PWM function
-CLRF PORTB    ;Clears the bits in portB
-CLRF RCSTA    ;Turns of the Control register
-CLRF SSPCON   ;Turns off the serial control port
-CLRF T1CON    ;Turns off timer control register
- BSF PIE1, 0 ;CUSTOM INTERRUPT
-MOVLW 0XC0
-MOVWF INTCON
+;Bank 1 - Set TRIS, pullups, etc.
+BSF STATUS, 5   ; Set RP0=1
+BCF STATUS, 6   ; Clear RP1=0, now bank 1
+MOVLW 0x0F      ; For TRISB: bits 3-0 input, 7-4 output
+MOVWF TRISB     ; Set TRISB (address 0x086)
+CLRF TRISA      ; Set TRISA=0x00, all PORTA outputs (adjust if some inputs needed)
+CLRF TRISC      ; PORTC all outputs
+MOVLW 0xFF      ; Enable pullups on PORTB
+MOVWF WPUB      ; WPUB (0x095)
+CLRF IOCB       ; Disable interrupt on change B (0x096)
+CLRF OPTION_REG ; Clear OPTION_REG (0x081), e.g., for prescaler
+CLRF PSTRCON    ; Disable PWM if needed
+;Bank 3 - Clear analog selects
+BSF STATUS, 5   ; RP0=1
+BSF STATUS, 6   ; RP1=1, now bank 3
+CLRF ANSEL      ; Clear ANSEL (0x188), make PORTA digital
+CLRF ANSELH     ; Clear ANSELH (0x189), make PORTB digital
+;Bank 2 - Comparator setup if needed
+BCF STATUS, 5   ; RP0=0
+BSF STATUS, 6   ; RP1=1, now bank 2
+CLRF CM2CON1    ; Clear comparator
+;Bank 0 - Clear ports, disable modules
+BCF STATUS, 5   ; RP0=0
+BCF STATUS, 6   ; RP1=0, bank 0
+CLRF PORTA      ; Clear PORTA
+CLRF PORTB      ; Clear PORTB
+CLRF PORTC      ; Clear PORTC
+CLRF CCP1CON    ; Disable PWM1
+CLRF CCP2CON    ; Disable PWM2
+CLRF RCSTA      ; Disable USART
+CLRF SSPCON     ; Disable SSP
+CLRF T1CON      ; Disable Timer1
+CLRF INTCON     ; Clear interrupts initially
+BSF PIE1, 0     ; Enable custom peripheral interrupt if needed
+MOVLW 0xC0      ; GIE=1, PEIE=1
+MOVWF INTCON    ; Enable interrupts
 ;Main Program Loop (Loops forever)
 
 SUB:
@@ -94,18 +89,20 @@ MOVWF PORTC	;Move W to F (PortC)
         
 MAINLOOP:
 
-TESTLOOP:
-    BTFSS PORTA, 1
-    GOTO BUTTON_PRESSED
-    BCF PORTA, 5 ;IF BUTTON ISN'T PRESSED CLEAR LIGHT
-BUTTON_PRESSED:
-   
-    BSF PIR1, 0
-     ; Scan Row 3 (keys 7,8,9) - RB4=1, RB5=1, RB6=0
+;TESTLOOP:
+;    BTFSS PORTA, 1
+;    GOTO BUTTON_PRESSED
+;    BCF PORTA, 5 ;IF BUTTON ISN'T PRESSED CLEAR LIGHT
+;BUTTON_PRESSED:
+;   
+;    BSF PIR1, 0
+;     ; Scan Row 3 (keys 7,8,9) - RB4=1, RB5=1, RB6=0
+    MOVLW 0x06
+    MOVWF PORTA
     MOVLW 0x60
     MOVWF PORTB
     
-SCAN:
+;SCAN:
 ; CALL DELAY
     BTFSS PORTB,3 ; Key 7
     GOTO DISP_9
@@ -117,6 +114,8 @@ SCAN:
      
     
     ; Scan Row 2 (keys 4,5,6) - RB4=1, RB5=0, RB6=1
+    MOVLW 0x05
+    MOVWF PORTA
     MOVLW 0x50
     MOVWF PORTB
 ; CALL DELAY
@@ -128,8 +127,11 @@ SCAN:
     GOTO DISP_4
     
    ; Scan Row 1 (keys 1,2,3) - RB4=0, RB5=1, RB6=1
+    MOVLW 0x03
+    MOVWF PORTA ; Debounce
     MOVLW 0x30
-    MOVWF PORTB ; Debounce
+    MOVWF PORTB
+    
     BTFSS PORTB,3 ; Key 1 (RB1=0)
     GOTO DISP_3
     BTFSS PORTB,2 ; Key 2
