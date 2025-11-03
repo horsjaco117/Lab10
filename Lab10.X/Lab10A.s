@@ -49,13 +49,14 @@ Start:
 ;Bank 1 - Set TRIS, pullups, etc.
 BSF STATUS, 5   ; Set RP0=1
 BCF STATUS, 6   ; Clear RP1=0, now bank 1
-MOVLW 0x0F      ; For TRISB: bits 3-0 input, 7-4 output
+MOVLW 0xFF      ; For TRISB: bits 3-0 input, 7-4 output
 MOVWF TRISB     ; Set TRISB (address 0x086)
 CLRF TRISA      ; Set TRISA=0x00, all PORTA outputs (adjust if some inputs needed)
 CLRF TRISC      ; PORTC all outputs
 MOVLW 0xFF      ; Enable pullups on PORTB
 MOVWF WPUB      ; WPUB (0x095)
-CLRF IOCB       ; Disable interrupt on change B (0x096)
+MOVLW 0X30
+MOVWF IOCB       ; Disable interrupt on change B (0x096)
 CLRF OPTION_REG ; Clear OPTION_REG (0x081), e.g., for prescaler
 CLRF PSTRCON    ; Disable PWM if needed
 ;Bank 3 - Clear analog selects
@@ -78,10 +79,12 @@ CLRF CCP2CON    ; Disable PWM2
 CLRF RCSTA      ; Disable USART
 CLRF SSPCON     ; Disable SSP
 CLRF T1CON      ; Disable Timer1
-CLRF INTCON     ; Clear interrupts initially
 BSF PIE1, 0     ; Enable custom peripheral interrupt if needed
-MOVLW 0xC0      ; GIE=1, PEIE=1
+;BCF INTCON, 0
+;BSF INTCON, 4
+MOVLW 0x88      ; GIE=1, PEIE=1
 MOVWF INTCON    ; Enable interrupts
+
 ;Main Program Loop (Loops forever)
 
 SUB:
@@ -89,6 +92,8 @@ MOVWF PORTC	;Move W to F (PortC)
         
 MAINLOOP:
 
+     BCF PORTA, 5
+    
 ;TESTLOOP:
 ;    BTFSS PORTA, 1
 ;    GOTO BUTTON_PRESSED
@@ -99,8 +104,8 @@ MAINLOOP:
 ;     ; Scan Row 3 (keys 7,8,9) - RB4=1, RB5=1, RB6=0
     MOVLW 0x06
     MOVWF PORTA
-    MOVLW 0x60
-    MOVWF PORTB
+ ;   MOVLW 0x60
+ ;   MOVWF PORTB
     
 ;SCAN:
 ; CALL DELAY
@@ -116,8 +121,8 @@ MAINLOOP:
     ; Scan Row 2 (keys 4,5,6) - RB4=1, RB5=0, RB6=1
     MOVLW 0x05
     MOVWF PORTA
-    MOVLW 0x50
-    MOVWF PORTB
+   ; MOVLW 0x50
+   ; MOVWF PORTB
 ; CALL DELAY
     BTFSS PORTB,3 ; Key 4
     GOTO DISP_6
@@ -127,10 +132,10 @@ MAINLOOP:
     GOTO DISP_4
     
    ; Scan Row 1 (keys 1,2,3) - RB4=0, RB5=1, RB6=1
-    MOVLW 0x03
+																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																    MOVLW 0x03
     MOVWF PORTA ; Debounce
-    MOVLW 0x30
-    MOVWF PORTB
+   ; MOVLW 0x30
+    ;MOVWF PORTB
     
     BTFSS PORTB,3 ; Key 1 (RB1=0)
     GOTO DISP_3
@@ -176,6 +181,9 @@ INTERRUPT:
 LIGHT:
     BSF PORTA, 5
   
+  ;  BCF PORTA, 5
+    
+    BCF INTCON, 0
     RETFIE
 
 END ;End of code. This is required
