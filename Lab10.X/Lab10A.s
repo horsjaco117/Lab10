@@ -59,11 +59,15 @@ MOVLW 0X30
 MOVWF IOCB       ; Disable interrupt on change B (0x096)
 CLRF OPTION_REG ; Clear OPTION_REG (0x081), e.g., for prescaler
 CLRF PSTRCON    ; Disable PWM if needed
+MOVLW 0X10
+MOVWF PIE2
 ;Bank 3 - Clear analog selects
 BSF STATUS, 5   ; RP0=1
 BSF STATUS, 6   ; RP1=1, now bank 3
 CLRF ANSEL      ; Clear ANSEL (0x188), make PORTA digital
 CLRF ANSELH     ; Clear ANSELH (0x189), make PORTB digital
+MOVLW 0X00
+MOVWF EECON1
 ;Bank 2 - Comparator setup if needed
 BCF STATUS, 5   ; RP0=0
 BSF STATUS, 6   ; RP1=1, now bank 2
@@ -80,6 +84,7 @@ CLRF RCSTA      ; Disable USART
 CLRF SSPCON     ; Disable SSP
 CLRF T1CON      ; Disable Timer1
 BSF PIE1, 0     ; Enable custom peripheral interrupt if needed
+CLRF PIR2
 ;BCF INTCON, 0
 ;BSF INTCON, 4
 MOVLW 0x88      ; GIE=1, PEIE=1
@@ -92,7 +97,7 @@ MOVWF PORTC	;Move W to F (PortC)
         
 MAINLOOP:
 
-     BCF PORTA, 5
+BCF PORTA, 5
     
 ;TESTLOOP:
 ;    BTFSS PORTA, 1
@@ -178,6 +183,7 @@ DISPLAY:
     GOTO MAINLOOP
 
 INTERRUPT:
+
 LIGHT:
     BSF PORTA, 5
   
