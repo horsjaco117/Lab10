@@ -1,3 +1,12 @@
+; Suggestions:
+; Fix DISP_1 value to 0x31 for ASCII '1' (likely typo from 0x20).
+; Remove GOTO DISP_0 and replace with GOTO KEYSCAN to avoid writing when no key pressed.
+; Add POSITION variable to store key presses in consecutive EEPROM addresses.
+; Add DELAY subroutine for debounce after setting each row.
+; In INTERRUPT, add dump routine to cycle through stored data on PORTC with delay to view the EEPROM data.
+; Add TEMP and TEMP2 for delays.
+; Limit POSITION to e.g., 0x10 to avoid overflow.
+
 ; LAB 3
 ; Jacob Horsley
 ; RCET
@@ -32,8 +41,11 @@
    
 ; Variables
     PSECT udata_bank0
-_ADDRESS: DS 1 ; Allocate byte for address variable
-_DATA: DS 1    ; Allocate byte for data variable
+_ADDRESS: DS 1 ; Address variable
+_DATA: DS 1    ; Data variable
+POSITION: DS 1 ; Current position for sequential write
+TEMP: DS 1     ; Delay temp
+TEMP2: DS 1    ; Delay temp2
    
 ; Start of Program
 ; Reset vector address
@@ -79,91 +91,82 @@ Start:
     MOVLW 0x88 ; GIE=1, RBIE=1
     MOVWF INTCON ; Enable interrupts
 ; Initialize variables
-    MOVLW 0x00
-    MOVWF _ADDRESS
-    MOVLW 0x00 ; Initial data, will be updated by interrupt
-    MOVWF _DATA
+    CLRF _ADDRESS
+    CLRF _DATA ; Initial data
+    CLRF POSITION
    
 ; Main Program Loop
 MAINLOOP:
-    BCF PORTA, 5
-   ; CALL WRITE_EEPROM
    
-
-BCF STATUS, 5   ; RP0=0
-BCF STATUS, 6   ; RP1=0, bank 0    
-    
-;     ; Scan Row 3 (keys 7,8,9) - RB4=1, RB5=1, RB6=0
+KEYSCAN:
+    BCF PORTA, 5
+   
+; Scan Row 3 (adjusted for correct key mapping)
     MOVLW 0x06
     MOVWF PORTA
-    
-;SCAN:
-; CALL DELAY
-    BTFSS PORTB,3 ; Key 7
+    CALL DELAY ; Debounce delay
+    BTFSS PORTB,3 ; Check column
     GOTO DISP_9
-    BTFSS PORTB,2 ; Key 8
+    BTFSS PORTB,2
     GOTO DISP_8
-    BTFSS PORTB,1 ; Key 9
+    BTFSS PORTB,1
     GOTO DISP_7
- 
-    ; Scan Row 2 (keys 4,5,6) - RB4=1, RB5=0, RB6=1
+   
+; Scan Row 2
     MOVLW 0x05
     MOVWF PORTA
-
-    BTFSS PORTB,3 ; Key 4
+    CALL DELAY
+    BTFSS PORTB,3
     GOTO DISP_6
-    BTFSS PORTB,2 ; Key 5
+    BTFSS PORTB,2
     GOTO DISP_5
-    BTFSS PORTB,1 ; Key 6
+    BTFSS PORTB,1
     GOTO DISP_4
-    
-   ; Scan Row 1 (keys 1,2,3) - RB4=0, RB5=1, RB6=1
-																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																    MOVLW 0x03
-    MOVWF PORTA ; Debounce
-
-    BTFSS PORTB,3 ; Key 1 (RB1=0)
+   
+; Scan Row 1
+    MOVLW 0x03
+    MOVWF PORTA
+    CALL DELAY
+    BTFSS PORTB,3
     GOTO DISP_3
-    BTFSS PORTB,2 ; Key 2
+    BTFSS PORTB,2
     GOTO DISP_2
-    BTFSS PORTB,1 ; Key 3
+    BTFSS PORTB,1
     GOTO DISP_1
-    
-    
-    GOTO DISP_0 ; **Change: Jump to DISP_0 instead of MAINLOOP**
-    
-DISP_0: MOVLW 0X53
-	GOTO DISPLAY
-DISP_1: MOVLW 0x20 ; 1
+   
+    GOTO KEYSCAN ; No key, loop without write
+   
+DISP_0: MOVLW 0x53 ; Unused, but kept for reference
         GOTO DISPLAY
-DISP_2: MOVLW 0x32 ; 2
+DISP_1: MOVLW 0x31 ; Fixed to '1'
         GOTO DISPLAY
-DISP_3: MOVLW 0x33 ; 3
+DISP_2: MOVLW 0x32 ; '2'
         GOTO DISPLAY
-DISP_4: MOVLW 0x34 ; 4 (if 0x04 shows 9, use 0x04 for 9, adjust others)
+DISP_3: MOVLW 0x33 ; '3'
         GOTO DISPLAY
-DISP_5: MOVLW 0x35 ; 5
+DISP_4: MOVLW 0x34 ; '4'
         GOTO DISPLAY
-DISP_6: MOVLW 0x36 ; 6
+DISP_5: MOVLW 0x35 ; '5'
         GOTO DISPLAY
-DISP_7: MOVLW 0x37 ; 7
+DISP_6: MOVLW 0x36 ; '6'
         GOTO DISPLAY
-DISP_8: MOVLW 0x38 ; 8
+DISP_7: MOVLW 0x37 ; '7'
         GOTO DISPLAY
-DISP_9: MOVLW 0x39 ; 9
+DISP_8: MOVLW 0x38 ; '8'
         GOTO DISPLAY
-
+DISP_9: MOVLW 0x39 ; '9'
+        GOTO DISPLAY
 DISPLAY:
-   ; MOVWF _ADDRESS
-   MOVWF _DATA
-   ; MOVWF PORTC
-  
-    ;GOTO WRITE_EEPROM
-
-    CALL READ_EEPROM
-    GOTO MAINLOOP
+    MOVWF _DATA
+    MOVF POSITION, W
+    MOVWF _ADDRESS
+    CALL WRITE_EEPROM
+    CALL READ_EEPROM ; Display on PORTC
+    INCF POSITION, F ; Next address
+    ; Optional: Check if POSITION >= 0x10, reset CLRF POSITION
+    GOTO KEYSCAN
    
 WRITE_EEPROM:
-    ; Assume entry in bank 0
     MOVF _ADDRESS, W
     BCF STATUS, 5
     BSF STATUS, 6 ; Bank 2
@@ -183,19 +186,16 @@ WRITE_EEPROM:
     MOVLW 0xAA
     MOVWF EECON2
     BSF EECON1, 1 ; WR=1
-WAIT_WR:
+    NOP
     BTFSC EECON1, 1
-    GOTO WAIT_WR ; Poll until WR=0
+    GOTO $-2 ; Poll until WR=0
     BCF EECON1, 2 ; WREN=0
     BCF STATUS, 5
     BCF STATUS, 6 ; Bank 0
     RETURN
    
 READ_EEPROM:
-    ; Assume entry in bank 0
-    MOVLW 0x00 ; Test address 0x00
-    MOVWF _ADDRESS
-    CLRF INTCON ; Disable interrupts temporarily
+    CLRF INTCON ; Disable interrupts
     MOVF _ADDRESS, W
     BCF STATUS, 5
     BSF STATUS, 6 ; Bank 2
@@ -216,10 +216,39 @@ READ_EEPROM:
 INTERRUPT:
     BCF STATUS, 5
     BCF STATUS, 6 ; Bank 0
-    BSF PORTA, 5
-;  MOVLW 0x35
- ;   MOVWF _DATA
-    CALL WRITE_EEPROM ; Add call to write on interrupt
+    BSF PORTA, 5 ; Indicate dump start
+    CLRF _ADDRESS ; Start from 0
+DUMP_LOOP:
+    CALL READ_EEPROM ; Show on PORTC
+    CALL DELAY_LONG ; Wait to view
+    INCF _ADDRESS, F
+    MOVF _ADDRESS, W
+    SUBWF POSITION, W
+    BTFSS STATUS, 0 ; If equal, done
+    GOTO DUMP_LOOP
+    BCF PORTA, 5 ; Off
+    ; Optional: CLRF POSITION to reset log
     BCF INTCON, 0 ; Clear RBIF
     RETFIE
+
+DELAY: ; Short delay for debounce
+    MOVLW 0x80 ; Adjust for timing
+    MOVWF TEMP
+DLOOP:
+    DECFSZ TEMP, F
+    GOTO DLOOP
+    RETURN
+
+DELAY_LONG: ; Longer delay for viewing
+    MOVLW 0x8F
+    MOVWF TEMP2
+DL_OUTER:
+    MOVLW 0x8F
+    MOVWF TEMP
+DL_INNER:
+    DECFSZ TEMP, F
+    GOTO DL_INNER
+    DECFSZ TEMP2, F
+    GOTO DL_OUTER
+    RETURN
 END
