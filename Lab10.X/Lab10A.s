@@ -1,12 +1,3 @@
-; Suggestions:
-; Fix DISP_1 value to 0x31 for ASCII '1' (likely typo from 0x20).
-; Remove GOTO DISP_0 and replace with GOTO KEYSCAN to avoid writing when no key pressed.
-; Add POSITION variable to store key presses in consecutive EEPROM addresses.
-; Add DELAY subroutine for debounce after setting each row.
-; In INTERRUPT, add dump routine to cycle through stored data on PORTC with delay to view the EEPROM data.
-; Add TEMP and TEMP2 for delays.
-; Limit POSITION to e.g., 0x10 to avoid overflow.
-
 ; LAB 3
 ; Jacob Horsley
 ; RCET
@@ -46,6 +37,9 @@ _DATA: DS 1    ; Data variable
 POSITION: DS 1 ; Current position for sequential write
 TEMP: DS 1     ; Delay temp
 TEMP2: DS 1    ; Delay temp2
+SAVE_W: DS 1   ; Interrupt save W
+SAVE_STATUS: DS 1 ; Interrupt save STATUS
+DUMP_GIE_SAVE: DS 1 ; Save GIE for dump
    
 ; Start of Program
 ; Reset vector address
@@ -138,7 +132,7 @@ KEYSCAN:
    
 DISP_0: MOVLW 0x53 ; Unused, but kept for reference
         GOTO DISPLAY
-DISP_1: MOVLW 0x31 ; Fixed to '1'
+DISP_1: MOVLW 0x31 ; '1'
         GOTO DISPLAY
 DISP_2: MOVLW 0x32 ; '2'
         GOTO DISPLAY
@@ -163,7 +157,13 @@ DISPLAY:
     CALL WRITE_EEPROM
     CALL READ_EEPROM ; Display on PORTC
     INCF POSITION, F ; Next address
-    ; Optional: Check if POSITION >= 0x10, reset CLRF POSITION
+    MOVF POSITION, W
+    SUBLW 0x09 ; W = 9 - POSITION
+    BTFSC STATUS, 0 ; If C=1 (<=9), goto NO_DUMP
+    GOTO NO_DUMP
+    CALL DUMP ; Dump after 10th write
+    CLRF POSITION
+NO_DUMP:
     GOTO KEYSCAN
    
 WRITE_EEPROM:
@@ -181,11 +181,13 @@ WRITE_EEPROM:
     BSF STATUS, 6 ; Bank 3
     BCF EECON1, 7 ; EEPM=0
     BSF EECON1, 2 ; WREN=1
+    BCF INTCON, 7 ; Disable interrupts for sequence
     MOVLW 0x55
     MOVWF EECON2
     MOVLW 0xAA
     MOVWF EECON2
     BSF EECON1, 1 ; WR=1
+    BSF INTCON, 7 ; Re-enable
     NOP
     BTFSC EECON1, 1
     GOTO $-2 ; Poll until WR=0
@@ -195,7 +197,7 @@ WRITE_EEPROM:
     RETURN
    
 READ_EEPROM:
-    CLRF INTCON ; Disable interrupts
+    ; Removed unnecessary disable/re-enable
     MOVF _ADDRESS, W
     BCF STATUS, 5
     BSF STATUS, 6 ; Bank 2
@@ -209,14 +211,14 @@ READ_EEPROM:
     BCF STATUS, 5
     BCF STATUS, 6 ; Bank 0
     MOVWF PORTC
-    MOVLW 0x88
-    MOVWF INTCON ; Re-enable
     RETURN
    
-INTERRUPT:
-    BCF STATUS, 5
-    BCF STATUS, 6 ; Bank 0
+DUMP:
     BSF PORTA, 5 ; Indicate dump start
+    CLRF DUMP_GIE_SAVE
+    BTFSC INTCON, 7
+    BSF DUMP_GIE_SAVE, 0
+    BCF INTCON, 7 ; Disable interrupts
     CLRF _ADDRESS ; Start from 0
 DUMP_LOOP:
     CALL READ_EEPROM ; Show on PORTC
@@ -224,13 +226,28 @@ DUMP_LOOP:
     INCF _ADDRESS, F
     MOVF _ADDRESS, W
     SUBWF POSITION, W
-    BTFSS STATUS, 0 ; If equal, done
+    BTFSS STATUS, 2 ; If Z=1 (equal), done
     GOTO DUMP_LOOP
+    BCF INTCON, 0 ; Clear any pending RBIF
+    BTFSC DUMP_GIE_SAVE, 0
+    BSF INTCON, 7 ; Restore GIE
     BCF PORTA, 5 ; Off
-    ; Optional: CLRF POSITION to reset log
+    RETURN
+   
+INTERRUPT:
+    MOVWF SAVE_W
+    SWAPF STATUS, W
+    MOVWF SAVE_STATUS
+    BCF STATUS, 5
+    BCF STATUS, 6 ; Bank 0
+    CALL DUMP ; Call dump on interrupt
     BCF INTCON, 0 ; Clear RBIF
+    SWAPF SAVE_STATUS, W
+    MOVWF STATUS
+    SWAPF SAVE_W, F
+    SWAPF SAVE_W, W
     RETFIE
-
+   
 DELAY: ; Short delay for debounce
     MOVLW 0x80 ; Adjust for timing
     MOVWF TEMP
@@ -238,7 +255,7 @@ DLOOP:
     DECFSZ TEMP, F
     GOTO DLOOP
     RETURN
-
+   
 DELAY_LONG: ; Longer delay for viewing
     MOVLW 0x8F
     MOVWF TEMP2
