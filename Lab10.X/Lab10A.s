@@ -59,15 +59,11 @@ MOVLW 0X30
 MOVWF IOCB       ; Disable interrupt on change B (0x096)
 CLRF OPTION_REG ; Clear OPTION_REG (0x081), e.g., for prescaler
 CLRF PSTRCON    ; Disable PWM if needed
-MOVLW 0X10
-MOVWF PIE2
 ;Bank 3 - Clear analog selects
 BSF STATUS, 5   ; RP0=1
 BSF STATUS, 6   ; RP1=1, now bank 3
 CLRF ANSEL      ; Clear ANSEL (0x188), make PORTA digital
 CLRF ANSELH     ; Clear ANSELH (0x189), make PORTB digital
-MOVLW 0X00
-MOVWF EECON1
 ;Bank 2 - Comparator setup if needed
 BCF STATUS, 5   ; RP0=0
 BSF STATUS, 6   ; RP1=1, now bank 2
@@ -84,11 +80,13 @@ CLRF RCSTA      ; Disable USART
 CLRF SSPCON     ; Disable SSP
 CLRF T1CON      ; Disable Timer1
 BSF PIE1, 0     ; Enable custom peripheral interrupt if needed
-CLRF PIR2
 ;BCF INTCON, 0
 ;BSF INTCON, 4
 MOVLW 0x88      ; GIE=1, PEIE=1
 MOVWF INTCON    ; Enable interrupts
+    
+_ADDRESS EQU 0X22
+_DATA EQU 0X23
 
 ;Main Program Loop (Loops forever)
 
@@ -96,15 +94,14 @@ SUB:
 MOVWF PORTC	;Move W to F (PortC) 
         
 MAINLOOP:
-
-BCF PORTA, 5
+BCF STATUS, 5   ; RP0=0
+BCF STATUS, 6   ; RP1=0, bank 0    
+MOVLW 0x88      ; GIE=1, PEIE=1
+MOVWF INTCON    ; Enable interrupts
     
-;TESTLOOP:
-;    BTFSS PORTA, 1
-;    GOTO BUTTON_PRESSED
-;    BCF PORTA, 5 ;IF BUTTON ISN'T PRESSED CLEAR LIGHT
-;BUTTON_PRESSED:
-;   
+     BCF PORTA, 5
+    
+
 ;    BSF PIR1, 0
 ;     ; Scan Row 3 (keys 7,8,9) - RB4=1, RB5=1, RB6=0
     MOVLW 0x06
@@ -178,12 +175,68 @@ DISP_9: MOVLW 0x39 ; 9
         GOTO DISPLAY
 
 DISPLAY:
+    MOVWF _ADDRESS
     MOVWF PORTC
 ;    CALL DELAY      ; Stabilize output
-    GOTO MAINLOOP
+    
+    GOTO WRITE_EEPROM
+;    GOTO MAINLOOP
+    
+WRITE_EEPROM:
+    MOVF _ADDRESS, 0
+    BCF STATUS, 5 
+    BSF STATUS, 6
+    MOVWF EEADR
+    BCF STATUS, 5
+    BCF STATUS, 6
+    MOVF _DATA, 0
+    BCF STATUS, 5
+    BSF STATUS, 6
+    MOVWF EEDATA
+    
+    BSF STATUS, 5
+    BSF STATUS, 6
+    BCF EECON1, 7
+    BCF EECON1, 2
+    MOVLW 0X55
+    MOVWF EECON2
+    MOVLW 0XAA
+    MOVWF EECON2
+    BSF EECON1, 1
+    
+    BCF STATUS, 5
+    BCF STATUS, 6
+    
+    GOTO MAINLOOP 
 
 INTERRUPT:
+    
+READ_EEPROM:
+      
+    BCF STATUS, 5
+    BCF STATUS, 6
+    CLRF INTCON
+    MOVF _ADDRESS,0
+    
+    BCF STATUS, 5
+    BSF STATUS, 6
+    MOVWF EEADR
+    
+    BSF STATUS, 5
+    BSF STATUS, 6 
+    BSF EECON1, 0
+    
+    BCF STATUS, 5
+    BSF STATUS, 6
+    MOVF EEDATA, W
+    
+    BCF STATUS, 5
+    BCF STATUS, 6
+    MOVWF PORTC
+    
+    ;RETURN
 
+    
 LIGHT:
     BSF PORTA, 5
   
