@@ -88,6 +88,77 @@ Start:
 MAINLOOP:
     BCF PORTA, 5
    ; CALL WRITE_EEPROM
+   
+
+BCF STATUS, 5   ; RP0=0
+BCF STATUS, 6   ; RP1=0, bank 0    
+    
+;     ; Scan Row 3 (keys 7,8,9) - RB4=1, RB5=1, RB6=0
+    MOVLW 0x06
+    MOVWF PORTA
+    
+;SCAN:
+; CALL DELAY
+    BTFSS PORTB,3 ; Key 7
+    GOTO DISP_9
+    BTFSS PORTB,2 ; Key 8
+    GOTO DISP_8
+    BTFSS PORTB,1 ; Key 9
+    GOTO DISP_7
+ 
+    ; Scan Row 2 (keys 4,5,6) - RB4=1, RB5=0, RB6=1
+    MOVLW 0x05
+    MOVWF PORTA
+
+    BTFSS PORTB,3 ; Key 4
+    GOTO DISP_6
+    BTFSS PORTB,2 ; Key 5
+    GOTO DISP_5
+    BTFSS PORTB,1 ; Key 6
+    GOTO DISP_4
+    
+   ; Scan Row 1 (keys 1,2,3) - RB4=0, RB5=1, RB6=1
+																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																    MOVLW 0x03
+    MOVWF PORTA ; Debounce
+
+    BTFSS PORTB,3 ; Key 1 (RB1=0)
+    GOTO DISP_3
+    BTFSS PORTB,2 ; Key 2
+    GOTO DISP_2
+    BTFSS PORTB,1 ; Key 3
+    GOTO DISP_1
+    
+    
+    GOTO DISP_0 ; **Change: Jump to DISP_0 instead of MAINLOOP**
+    
+DISP_0: MOVLW 0X53
+	GOTO DISPLAY
+DISP_1: MOVLW 0x20 ; 1
+        GOTO DISPLAY
+DISP_2: MOVLW 0x32 ; 2
+        GOTO DISPLAY
+DISP_3: MOVLW 0x33 ; 3
+        GOTO DISPLAY
+DISP_4: MOVLW 0x34 ; 4 (if 0x04 shows 9, use 0x04 for 9, adjust others)
+        GOTO DISPLAY
+DISP_5: MOVLW 0x35 ; 5
+        GOTO DISPLAY
+DISP_6: MOVLW 0x36 ; 6
+        GOTO DISPLAY
+DISP_7: MOVLW 0x37 ; 7
+        GOTO DISPLAY
+DISP_8: MOVLW 0x38 ; 8
+        GOTO DISPLAY
+DISP_9: MOVLW 0x39 ; 9
+        GOTO DISPLAY
+
+DISPLAY:
+   ; MOVWF _ADDRESS
+   MOVWF _DATA
+   ; MOVWF PORTC
+  
+    ;GOTO WRITE_EEPROM
+
     CALL READ_EEPROM
     GOTO MAINLOOP
    
@@ -146,8 +217,8 @@ INTERRUPT:
     BCF STATUS, 5
     BCF STATUS, 6 ; Bank 0
     BSF PORTA, 5
-    MOVLW 0x35
-    MOVWF _DATA
+;  MOVLW 0x35
+ ;   MOVWF _DATA
     CALL WRITE_EEPROM ; Add call to write on interrupt
     BCF INTCON, 0 ; Clear RBIF
     RETFIE
