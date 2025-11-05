@@ -20,6 +20,7 @@ SAVE_W:         DS 1   ; ISR context
 SAVE_STATUS:    DS 1   ; ISR context
 DUMP_GIE_SAVE:  DS 1   ; Save GIE during dump
 STATE:          DS 1   ; 0 = flash S, 1 = keyscan
+STOP:		DS 1   ;FOR THE STOPPING OF WRITING 
 
 ;---------------------------------------------------------------------
 ; Reset & Interrupt vectors
@@ -117,6 +118,11 @@ FLASH_S_MODE:
 ; KEYSCAN MODE
 ;=====================================================================
 KEYSCAN_MODE:
+ ;   MOVLW STOP
+ ;   XORLW 0XFF
+ ;   BTFSS STATUS, 2
+ ;   GOTO NO_DUMP2
+    
     BCF   PORTA,5
 
     ;--- Row 3 --------------------------------------------------------
@@ -154,6 +160,8 @@ KEYSCAN_MODE:
     GOTO  DISP_2
     BTFSS PORTB,1
     GOTO  DISP_1
+    BTFSC STOP, 1
+    GOTO DISP_S
 
     GOTO  KEYSCAN_MODE
 
@@ -195,6 +203,11 @@ DISP_8:
 DISP_9:
     MOVLW 0x39
     GOTO  HANDLE_KEY
+    
+DISP_S:
+    CLRF STOP
+    MOVLW 0X53
+    GOTO HANDLE_KEY
 
 ;=====================================================================
 ; HANDLE_KEY ? Write once, wait for release
@@ -218,6 +231,7 @@ HANDLE_KEY:
     GOTO  MAINLOOP
 
 NO_DUMP2:
+;    CLRF STOP
     CALL  WAIT_KEY_RELEASE
     GOTO  MAINLOOP
 
@@ -328,15 +342,43 @@ INTERRUPT:
     MOVWF SAVE_W
     SWAPF STATUS,W
     MOVWF SAVE_STATUS
+    
+   ; BTFSS PORTB, 5
+   ; GOTO _DUMP
+  ;  GOTO _RETURN
+   ; GOTO _DUMP
+    _DUMP:
     BCF   STATUS,5
     BCF   STATUS,6
     CALL  DUMP
+    
+    MOVLW 0X0A
+    MOVF _ADDRESS, W
+    MOVLW 0X0A
+    MOVF POSITION, W
+    
+    MOVLW 0XFF
+    MOVWF STOP
+
+    
     BCF   INTCON,0
+    GOTO _RETURN
+    
+    _RETURN:
+    MOVLW 0X0A
+    MOVF _ADDRESS, W
+    MOVLW 0X0A
+    MOVF POSITION, W
+    BCF STATE, 0
+    BCF INTCON, 0
+    MOVLW 0X53
+    MOVWF PORTC
     SWAPF SAVE_STATUS,W
     MOVWF STATUS
     SWAPF SAVE_W,F
     SWAPF SAVE_W,W
     RETFIE
+    
 
 ;=====================================================================
 ; DELAYS
