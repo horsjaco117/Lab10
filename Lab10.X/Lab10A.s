@@ -78,7 +78,8 @@ Start:
     ;--- Initialise variables -----------------------------------------
     CLRF _ADDRESS
     CLRF _DATA
-    CLRF POSITION
+    MOVLW 0X0A
+    MOVWF POSITION
     CLRF STATE             ; start in flash-S mode
 
 ;=====================================================================
@@ -349,10 +350,10 @@ DLOOP:
     RETURN
 
 DELAY_LONG:
-    MOVLW 0x8F
+    MOVLW 0xFF
     MOVWF TEMP2
 DL_OUTER:
-    MOVLW 0x8F
+    MOVLW 0xFF
     MOVWF TEMP
 DL_INNER:
     DECFSZ TEMP,F
