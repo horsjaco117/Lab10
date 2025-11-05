@@ -1,9 +1,9 @@
-; LAB 3
+; LAB 10 EEPROM
 ; Jacob Horsley
 ; RCET
 ; Fifth Semester
 ; Program/Project
-; Git URL
+; Git URL: https://github.com/horsjaco117/Lab10
    
    
 ; Device Setup
@@ -156,12 +156,12 @@ DISPLAY:
     MOVWF _ADDRESS
     CALL WRITE_EEPROM
     CALL READ_EEPROM ; Display on PORTC
-    INCF POSITION, F ; Next address
-    MOVF POSITION, W
-    SUBLW 0x09 ; W = 9 - POSITION
-    BTFSC STATUS, 0 ; If C=1 (<=9), goto NO_DUMP
+        INCF POSITION, F
+    MOVLW POSITION              ; Compare to 10
+    XORLW 0XA0     ; W = POSITION - 10
+    BTFSS STATUS, 2         ; Skip if Zero (POSITION == 10)
     GOTO NO_DUMP
-    CALL DUMP ; Dump after 10th write
+    CALL DUMP
     CLRF POSITION
 NO_DUMP:
     GOTO KEYSCAN
