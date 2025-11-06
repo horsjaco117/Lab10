@@ -136,7 +136,9 @@ KEYSCAN_MODE:
     GOTO  DISP_8
     BTFSS PORTB,1
     GOTO  DISP_7
-
+    BTFSS PORTB,0
+    GOTO DISP_C
+    
     ;--- Row 2 --------------------------------------------------------
     MOVLW 0x05
     MOVWF PORTA
@@ -148,6 +150,8 @@ KEYSCAN_MODE:
     GOTO  DISP_5
     BTFSS PORTB,1
     GOTO  DISP_4
+    BTFSS PORTB,0
+    GOTO DISP_B
 
     ;--- Row 1 --------------------------------------------------------
     MOVLW 0x03
@@ -160,6 +164,9 @@ KEYSCAN_MODE:
     GOTO  DISP_2
     BTFSS PORTB,1
     GOTO  DISP_1
+    BTFSS PORTB,0
+    GOTO DISP_A
+    
     BTFSC STOP, 1
     GOTO DISP_S
 
@@ -203,6 +210,16 @@ DISP_8:
 DISP_9:
     MOVLW 0x39
     GOTO  HANDLE_KEY
+    
+DISP_A:    MOVLW 0x0A ; A
+           GOTO HANDLE_KEY
+DISP_B:    MOVLW 0x0B ; B
+           GOTO HANDLE_KEY
+DISP_C:    MOVLW 0x0C ; C
+           GOTO HANDLE_KEY
+DISP_D:    MOVLW 0x0D ; D
+           GOTO HANDLE_KEY
+
     
 DISP_S:
     CLRF STOP
